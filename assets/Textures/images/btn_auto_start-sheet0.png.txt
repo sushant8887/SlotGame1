@@ -1,0 +1,1 @@
+btn_auto_start-sheet0_01.png.png 3 0, btn_auto_start-sheet0_02.png.png 3 0, btn_auto_start-sheet0_03.png.png 10 12, btn_auto_start-sheet0_04.png.png 0 36, btn_auto_start-sheet0_05.png.png 4 106, btn_auto_start-sheet0_06.png.png 10 118.

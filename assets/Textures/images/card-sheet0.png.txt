@@ -1,0 +1,1 @@
+card-sheet0_01.png.png 13 218, card-sheet0_02.png.png 13 218, card-sheet0_03.png.png 205 292, card-sheet0_04.png.png 21 0, card-sheet0_05.png.png 207 0.

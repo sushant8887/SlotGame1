@@ -1,0 +1,1 @@
+btn_spin-sheet0_01.png.png 0 0, btn_spin-sheet0_02.png.png 0 0.
