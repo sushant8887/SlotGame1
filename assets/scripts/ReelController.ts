@@ -14,10 +14,59 @@ export class ReelController extends Component {
 
     private stopSymbols: string[][] = [];
     public funModeEnabled: boolean = false;
+    
+    // Object pool for symbol nodes to improve performance
+    private symbolPool: Map<string, Node[]> = new Map();
+    private readonly maxPoolSize = 20; // Maximum nodes per symbol type to keep in pool
 
     onLoad() {
+        this.initializeSymbolPool();
         this.fillReelsWithRandomStops();
         this.storeAuthFromUrl();
+    }
+
+    /**
+     * Initialize the object pool for symbol nodes
+     */
+    private initializeSymbolPool() {
+        this.stopPrefabs.forEach(prefab => {
+            this.symbolPool.set(prefab.name, []);
+        });
+    }
+
+    /**
+     * Get a symbol node from pool or create new one
+     */
+    private getSymbolFromPool(prefabName: string): Node | null {
+        const prefab = this.stopPrefabs.find(p => p.name === prefabName);
+        if (!prefab) return null;
+
+        const pool = this.symbolPool.get(prefabName);
+        if (pool && pool.length > 0) {
+            const node = pool.pop();
+            node.active = true;
+            return node;
+        }
+
+        // Create new node if pool is empty
+        return instantiate(prefab);
+    }
+
+    /**
+     * Return a symbol node to the pool for reuse
+     */
+    private returnSymbolToPool(node: Node, prefabName: string) {
+        if (!node) return;
+
+        const pool = this.symbolPool.get(prefabName);
+        if (pool && pool.length < this.maxPoolSize) {
+            node.active = false;
+            node.removeFromParent();
+            pool.push(node);
+        } else {
+            // Pool is full, destroy the node
+            node.destroy();
+        }
     }
 
      
@@ -46,6 +95,13 @@ export class ReelController extends Component {
 
     fillReelsWithRandomStops() {
         this.reelNodes.forEach((reel, reelIndex) => {
+            // Return existing symbols to the pool before clearing
+            reel.children.forEach(child => {
+                const prefabName = this.getPrefabNameFromNode(child);
+                if (prefabName) {
+                    this.returnSymbolToPool(child, prefabName);
+                }
+            });
             reel.removeAllChildren();
     
             const symbolHeight = 190;  // Uniform height for alignment
@@ -53,7 +109,10 @@ export class ReelController extends Component {
     
             for (let i = 0; i < 3; i++) { // Fill each reel with 3 symbols
                 const randIndex = Math.floor(Math.random() * this.stopPrefabs.length);
-                const stopNode = instantiate(this.stopPrefabs[randIndex]);
+                const prefabName = this.stopPrefabs[randIndex].name;
+                const stopNode = this.getSymbolFromPool(prefabName);
+                
+                if (!stopNode) continue;
     
                 // Set uniform size (optional)
                 const uiTransform = stopNode.getComponent(UITransform);
@@ -66,6 +125,19 @@ export class ReelController extends Component {
                 reel.addChild(stopNode);
             }
         });
+    }
+
+    /**
+     * Helper method to get prefab name from a node (for pool management)
+     */
+    private getPrefabNameFromNode(node: Node): string | null {
+        // Try to match node against known prefab names
+        for (const prefab of this.stopPrefabs) {
+            if (node.name.includes(prefab.name) || node._prefab === prefab) {
+                return prefab.name;
+            }
+        }
+        return null;
     }
     
 
@@ -99,12 +171,22 @@ export class ReelController extends Component {
         const extraCount = 10; // buffer to scroll
         const totalSymbols = visibleCount + extraCount;
 
+        // Return existing symbols to pool before clearing
+        reel.children.forEach(child => {
+            const prefabName = this.getPrefabNameFromNode(child);
+            if (prefabName) {
+                this.returnSymbolToPool(child, prefabName);
+            }
+        });
         reel.removeAllChildren();
 
-        // Create scrollable symbol list
+        // Create scrollable symbol list using object pool
         for (let i = 0; i < totalSymbols; i++) {
             const randIndex = Math.floor(Math.random() * this.stopPrefabs.length);
-            const stopNode = instantiate(this.stopPrefabs[randIndex]);
+            const prefabName = this.stopPrefabs[randIndex].name;
+            const stopNode = this.getSymbolFromPool(prefabName);
+
+            if (!stopNode) continue;
 
             const uiTransform = stopNode.getComponent(UITransform);
             if (uiTransform) {
@@ -159,6 +241,13 @@ export class ReelController extends Component {
         const spinTween = reel['spinTween'];
         if (spinTween) spinTween.stop();
 
+        // Return existing symbols to pool before clearing
+        reel.children.forEach(child => {
+            const prefabName = this.getPrefabNameFromNode(child);
+            if (prefabName) {
+                this.returnSymbolToPool(child, prefabName);
+            }
+        });
         reel.removeAllChildren();
 
         const finalSymbols = this.stopSymbols[reelIndex];
@@ -169,7 +258,9 @@ export class ReelController extends Component {
             const prefab = this.getPrefabBySymbolName(symbolKey);
             if (!prefab) return;
 
-            const stopNode = instantiate(prefab);
+            const stopNode = this.getSymbolFromPool(prefab.name);
+            if (!stopNode) return;
+
             stopNode.name = `Reel${reelIndex + 1}_Stop${stopPos + 1}`;
 
             const uiTransform = stopNode.getComponent(UITransform);
@@ -196,6 +287,14 @@ export class ReelController extends Component {
             if (spinTween) {
                 spinTween.stop();
             }
+            
+            // Return existing symbols to pool before clearing
+            reel.children.forEach(child => {
+                const prefabName = this.getPrefabNameFromNode(child);
+                if (prefabName) {
+                    this.returnSymbolToPool(child, prefabName);
+                }
+            });
             reel.removeAllChildren();
             reel.setPosition(new Vec3(reel.position.x, 0, reel.position.z)); // reset position
         }

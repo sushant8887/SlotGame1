@@ -35,7 +35,18 @@ export class AudioManager extends Component {
         this.bgSource.clip = this.audioMap.get('backgroundcommon');
         this.bgSource.loop = true;
         this.bgSource.volume = 0.2;
-        this.bgSource.play();
+        
+        // Load background audio asynchronously to not block game initialization
+        this.initializeBackgroundAudio();
+    }
+
+    private initializeBackgroundAudio() {
+        // Use setTimeout to make this non-blocking
+        setTimeout(() => {
+            if (this.bgSource && this.bgSource.clip) {
+                this.bgSource.play();
+            }
+        }, 100); // Small delay to ensure game starts smoothly
     }
 
 
