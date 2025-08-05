@@ -89,12 +89,23 @@ export class GameController extends Component {
         }
 
         try {
-            this.gameConfig = await GameApi.getGameConfig(gid);
+            // Load game config and player data in parallel for better performance
+            const [gameConfig, playerData] = await Promise.all([
+                GameApi.getGameConfig(gid),
+                GameApi.getPlayerDetails()
+            ]);
+            
+            this.gameConfig = gameConfig;
             this.betSteps = this.gameConfig.betSteps || [1, 2, 5, 10, 15, 20];
             this.maxLines = this.gameConfig.maxLines || 10;
             this.maxLinesLabel.string = `${this.maxLines}`;
             this.currentBetIndex = 0;
             this.updateBetLabels();
+            
+            // Update balance if player data loaded successfully
+            if (playerData && playerData.balance !== undefined) {
+                this.updateBalance(playerData.balance);
+            }
             //console.log('Game Config:', this.gameConfig);
         } catch (err) {
             console.error('Failed to load config:', err);
@@ -104,14 +115,12 @@ export class GameController extends Component {
             //console.error('Failed to fetch game config:', err);
         }
 
-        //this.updateBetLabels();
-
         // Add touch event to sprite
         this.betRateSprite.on(Node.EventType.TOUCH_END, this.onBetSpriteClicked, this);
         this.maxBet.on(Node.EventType.TOUCH_END, this.onMaxBetClicked, this);
     }
     onLoad() {
-        this.loadPlayerData();
+        // Initialize game UI components - player data will be loaded in parallel in start()
         GameApi.setPopup(this.popup);
         this.spinButton.on(Button.EventType.CLICK, this.onSpinClicked, this);
         if (this.iBtn) {
